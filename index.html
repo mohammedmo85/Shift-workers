@@ -147,6 +147,11 @@
     color: var(--bg);
   }
 
+  .tab-btn.active-fuel {
+    background: #e0a84a;
+    color: var(--bg);
+  }
+
   .deco-line {
     height: 1px;
     background: linear-gradient(90deg, transparent, var(--accent), transparent);
@@ -1103,6 +1108,20 @@
   /* ─── Fuel Calendar Coloring ──────────────────────────── */
   .fuel-cal-icon-active { filter: drop-shadow(0 0 6px #e0a84a) brightness(1.3); transform: scale(1.15) !important; }
 
+  #fuelFillBtn.fuel-filled {
+    background: linear-gradient(135deg,#6b7280,#4b5563) !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3) !important;
+  }
+  #fuelFillBtn.fuel-ready {
+    background: linear-gradient(135deg,#22c55e,#16a34a) !important;
+    box-shadow: 0 0 18px rgba(34,197,94,0.5),0 4px 16px rgba(0,0,0,0.3) !important;
+    animation: fuelBtnPulse 1.5s ease-in-out infinite;
+  }
+  @keyframes fuelBtnPulse {
+    0%,100% { box-shadow: 0 0 14px rgba(34,197,94,0.4),0 4px 16px rgba(0,0,0,0.3); }
+    50%      { box-shadow: 0 0 32px rgba(34,197,94,0.85),0 4px 20px rgba(0,0,0,0.4); }
+  }
+
   .day-cell.fuel-period-0:not(.today) { background: rgba(232,122,122,0.25) !important; border: 1px solid rgba(232,122,122,0.5) !important; }
   .day-cell.fuel-period-1:not(.today) { background: rgba(109,184,122,0.25) !important; border: 1px solid rgba(109,184,122,0.5) !important; }
   .day-cell.fuel-period-2:not(.today) { background: rgba(143,164,232,0.25) !important; border: 1px solid rgba(143,164,232,0.5) !important; }
@@ -1114,6 +1133,17 @@
   .day-cell.fuel-period-2:not(.today) .day-miladi { color: #8fa4e8 !important; }
   .day-cell.fuel-period-3:not(.today) .day-miladi { color: #e0a84a !important; }
   .day-cell.fuel-period-4:not(.today) .day-miladi { color: #c064dc !important; }
+
+  /* أيقونة بداية الدورة */
+  .day-cell.fuel-cycle-start::before {
+    content: '⛽';
+    position: absolute;
+    font-size: 8px;
+    top: 2px;
+    right: 3px;
+    line-height: 1;
+    opacity: 0.9;
+  }
 
   .day-cell.selected.fuel-period-0:not(.today) .day-miladi,
   .day-cell.selected.fuel-period-1:not(.today) .day-miladi,
@@ -1293,12 +1323,13 @@
 
 <div class="calendar-wrapper">
   <div class="calendar-header">
-    <div class="calendar-title">التقويم الميلادي والهجري</div>
+    <div class="calendar-title" style="display:none;">التقويم الميلادي والهجري</div>
   </div>
 
   <div class="tab-switcher">
-    <button class="tab-btn active-miladi" id="tabMiladi" onclick="switchTab('miladi')">📅 ميلادي</button>
-    <button class="tab-btn" id="tabHijri" onclick="switchTab('hijri')">🌙 هجري</button>
+    <button class="tab-btn" id="tabFuel" onclick="switchTab('fuel')">⛽ بنزين</button>
+    <button class="tab-btn active-miladi" id="tabMiladi" onclick="switchTab('miladi')">📅 مناوبات</button>
+    <button class="tab-btn" id="tabHijri" onclick="switchTab('hijri')" style="display:none;">🌙 هجري</button>
     <button class="tab-btn" id="tabAbout" onclick="switchTab('about')">ℹ️ حول</button>
   </div>
 
@@ -1308,8 +1339,6 @@
     <div class="shift-badge shift-B" id="badge-B" onclick="toggleShiftFilter('B')"><div class="shift-dot"></div>وجبة ب</div>
     <div class="shift-badge shift-C" id="badge-C" onclick="toggleShiftFilter('C')"><div class="shift-dot"></div>وجبة ج</div>
     <div class="shift-badge shift-D" id="badge-D" onclick="toggleShiftFilter('D')"><div class="shift-dot"></div>وجبة د</div>
-    <div id="fuelCalIcon" onclick="toggleFuelCalendar()" title="تلوين التقويم كل ٥ أيام"
-      style="cursor:pointer;font-size:28px;transition:transform 0.2s,filter 0.2s;user-select:none;display:flex;align-items:center;padding:0 4px;">⛽</div>
   </div>
   <div id="fuelStatusMsg" style="text-align:center;font-size:11px;color:var(--accent2);min-height:14px;opacity:0;transition:opacity 0.4s;margin-bottom:4px;"></div>
 
@@ -1337,12 +1366,12 @@
       </div>
       <div class="days-grid" id="daysGrid"></div>
       <div class="footer">
-        <button class="today-btn" onclick="goToday()">اليوم</button>
+        <button class="today-btn" style="display:none;" onclick="goToday()">اليوم</button>
         <div class="selected-date" id="selectedDate"></div>
       </div>
     </div>
     <!-- Fuel Info Bar -->
-    <div class="fuel-info-bar" id="fuelInfoBar">
+    <div class="fuel-info-bar" id="fuelInfoBar" style="display:none !important;">
       <div class="fuel-info-bar-text">
         <span>⛽</span>
         <span class="fuel-info-label">استلام الحصة التالي:</span>
@@ -1413,10 +1442,7 @@
         <div class="about-block-title">⛽ بطاقة البنزين</div>
         <div class="about-block-body">
           اضغط على أيقونة ⛽ في أعلى التقويم لتفعيل تلوين حصص البنزين.<br><br>
-          • تُلوَّن أيام التقويم بـ ٥ ألوان تمثل دورات الاستلام كل ٥ أيام.<br><br>
-          • يظهر شريط أسفل التقويم يعرض موعد استلام الحصة القادمة مع عداد تنازلي.<br><br>
-          • لتحديد يوم التفويل يدوياً: اضغط على اليوم مرتين، فتتغير خلفيته إلى برتقالي بارز مع أيقونة ⛽.<br><br>
-          • الضغط مرة ثالثة على نفس اليوم يلغي التعليم.
+          • تُلوَّن أيام التقويم بـ ٥ ألوان تمثل دورات الاستلام كل ٥ أيام.
         </div>
       </div>
 
@@ -1485,6 +1511,78 @@
       </div>
     </div>
   </div>
+
+  <!-- FUEL PANE -->
+  <div class="pane" id="paneFuel" style="display:none;">
+    <div class="deco-line" style="background:linear-gradient(90deg,transparent,#e0a84a,transparent);"></div>
+    <!-- زر فول بنزين -->
+    <div style="display:flex;justify-content:center;margin-bottom:14px;">
+      <button id="fuelFillBtn" onclick="toggleFuelFill()" style="
+        padding:12px 36px;
+        border-radius:14px;
+        border:none;
+        background:linear-gradient(135deg,#22c55e,#16a34a);
+        color:#fff;
+        font-family:'Tajawal','Segoe UI',Tahoma,Arial,sans-serif;
+        font-size:17px;
+        font-weight:700;
+        letter-spacing:1px;
+        cursor:pointer;
+        box-shadow:0 0 18px rgba(34,197,94,0.5),0 4px 16px rgba(0,0,0,0.3);
+        transition:all 0.3s ease;
+        display:flex;align-items:center;gap:10px;
+        min-width:180px;justify-content:center;
+      ">
+        <span style="font-size:22px;">⛽</span>
+        <span id="fuelFillBtnText">فول بنزين</span>
+      </button>
+    </div>
+    <div class="nav-row">
+      <button class="nav-btn" style="color:#e0a84a;" onclick="navigateFuelH(-1)">&#x2039;</button>
+      <div class="month-display">
+        <div class="month-name" id="fuelMiladiMonthName"></div>
+        <div class="year-display" id="fuelMiladiYearDisplay"></div>
+      </div>
+      <button class="nav-btn" style="color:#e0a84a;" onclick="navigateFuelH(1)">&#x203A;</button>
+    </div>
+
+    <div class="calendar-grid" style="border-color:rgba(224,168,74,0.25);">
+      <div class="day-names" style="background:rgba(224,168,74,0.06);">
+        <div class="day-name">الاحد</div>
+        <div class="day-name">الاثنين</div>
+        <div class="day-name">الثلاثاء</div>
+        <div class="day-name">الاربعاء</div>
+        <div class="day-name">الخميس</div>
+        <div class="day-name">الجمعة</div>
+        <div class="day-name">السبت</div>
+      </div>
+      <div class="days-grid" id="fuelHijriDaysGrid"></div>
+      <div class="footer" style="background:rgba(224,168,74,0.03);">
+        <button class="today-btn" style="border-color:#e0a84a;color:#e0a84a;display:none;" onclick="goTodayFuelH()">اليوم</button>
+        <div class="selected-date" style="color:#e0a84a;" id="fuelHijriSelectedDate"></div>
+      </div>
+    </div>
+    <div class="fuel-info-bar" id="fuelInfoBarH" style="margin-top:10px;display:none !important;">
+      <div class="fuel-info-bar-text">
+        <span>&#x26FD;</span>
+        <span class="fuel-info-label">استلام الحصة التالي:</span>
+        <span class="fuel-info-next" id="fuelInfoNextCountdownH">...</span>
+      </div>
+      <div class="fuel-info-bar-text" id="fuelMarkedRowH" style="display:none;">
+        <span>&#x1F4CC;</span>
+        <span class="fuel-info-label">آخر تفويل:</span>
+        <span class="fuel-info-date" id="fuelMarkedDisplayH" style="color:#ff9900;font-weight:700;">-</span>
+      </div>
+    </div>
+    <div style="display:none;gap:6px;flex-wrap:wrap;justify-content:center;margin-top:12px;font-size:11px;">
+      <span style="display:flex;align-items:center;gap:4px;"><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:rgba(232,122,122,0.7);"></span>دورة 1</span>
+      <span style="display:flex;align-items:center;gap:4px;"><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:rgba(109,184,122,0.7);"></span>دورة 2</span>
+      <span style="display:flex;align-items:center;gap:4px;"><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:rgba(143,164,232,0.7);"></span>دورة 3</span>
+      <span style="display:flex;align-items:center;gap:4px;"><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:rgba(224,168,74,0.7);"></span>دورة 4</span>
+      <span style="display:flex;align-items:center;gap:4px;"><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:rgba(180,100,220,0.7);"></span>دورة 5</span>
+    </div>
+  </div>
+
 </div>
 
 <script>
@@ -1571,16 +1669,21 @@ let activeShiftFilter = (_savedShift && _savedShift !== 'null') ? _savedShift : 
 // ─── Tab switch ─────────────────────────────────────────────────────────────
 function switchTab(tab) {
   activeTab = tab;
+  const isFuel = tab === 'fuel';
+  const isAbout = tab === 'about';
   document.getElementById('paneMiladi').classList.toggle('active', tab === 'miladi');
   document.getElementById('paneHijri').classList.toggle('active', tab === 'hijri');
-  document.getElementById('paneAbout').style.display = tab === 'about' ? 'block' : 'none';
+  document.getElementById('paneFuel').style.display = isFuel ? 'block' : 'none';
+  document.getElementById('paneAbout').style.display = isAbout ? 'block' : 'none';
   document.getElementById('tabMiladi').className = 'tab-btn' + (tab === 'miladi' ? ' active-miladi' : '');
-  document.getElementById('tabHijri').className = 'tab-btn' + (tab === 'hijri' ? ' active-hijri' : '');
-  document.getElementById('tabAbout').className = 'tab-btn' + (tab === 'about' ? ' active-miladi' : '');
-  // Hide legend and alarm when on about tab
-  document.querySelector('.shift-legend').style.display = tab === 'about' ? 'none' : '';
-  document.getElementById('alarmSection').style.display = tab === 'about' ? 'none' : '';
-  if (tab === 'about') return;
+  document.getElementById('tabHijri').className  = 'tab-btn' + (tab === 'hijri'  ? ' active-hijri'  : '');
+  document.getElementById('tabFuel').className   = 'tab-btn' + (isFuel           ? ' active-fuel'   : '');
+  document.getElementById('tabAbout').className  = 'tab-btn' + (isAbout          ? ' active-miladi' : '');
+  const hideSidebars = isAbout || isFuel;
+  document.querySelector('.shift-legend').style.display = hideSidebars ? 'none' : '';
+  document.getElementById('alarmSection').style.display = hideSidebars ? 'none' : '';
+  document.getElementById('fuelStatusMsg').style.display = hideSidebars ? 'none' : '';
+  if (isFuel) { renderFuelHijri(); updateFuelInfoBarH(); }
 }
 
 // ─── Miladi render ───────────────────────────────────────────────────────────
@@ -2040,7 +2143,8 @@ function getNextFuelDate() {
   const diffMs = today - startDay;
   if (diffMs < 0) return FUEL_ALARM_START;
   const diffDays = Math.floor(diffMs / 86400000);
-  const daysUntilNext = 5 - (diffDays % 5);
+  const rem = diffDays % 5;
+  const daysUntilNext = rem === 0 ? 0 : 5 - rem; // اليوم نفسه هو بداية الدورة لو rem == 0
   const nextDate = new Date(today);
   nextDate.setDate(today.getDate() + daysUntilNext);
   return nextDate;
@@ -2735,13 +2839,10 @@ const FUEL_START = new Date(2025, 4, 25); // 25 مايو 2025 — نقطة ال�
 function toggleFuelCalendar() {
   fuelCalActive = !fuelCalActive;
   localStorage.setItem('fuelCalActive', fuelCalActive);
-  const icon = document.getElementById('fuelCalIcon');
   if (fuelCalActive) {
-    icon.classList.add('fuel-cal-icon-active');
     fuelShowStatus('⛽ تم تفعيل تلوين البنزين كل ٥ أيام');
     updateFuelInfoBar();
   } else {
-    icon.classList.remove('fuel-cal-icon-active');
     fuelShowStatus('تم إيقاف تلوين البنزين');
     document.getElementById('fuelInfoBar').classList.remove('visible');
   }
@@ -2750,8 +2851,6 @@ function toggleFuelCalendar() {
 
 function cancelFuelCalendar() {
   fuelCalActive = false;
-  const icon = document.getElementById('fuelCalIcon');
-  icon.classList.remove('fuel-cal-icon-active');
   document.getElementById('fuelInfoBar').classList.remove('visible');
   fuelShowStatus('تم إيقاف تلوين البنزين');
   window.renderMiladi();
@@ -2819,7 +2918,6 @@ addShiftIndicators();
 if (activeShiftFilter) applyShiftFilter();
 // استعادة حالة أيقونة البنزين
 if (fuelCalActive) {
-  document.getElementById('fuelCalIcon')?.classList.add('fuel-cal-icon-active');
   updateFuelInfoBar();
 }
 
@@ -3042,6 +3140,211 @@ self.addEventListener('fetch', e => {
     navigator.serviceWorker.ready.then(reg => syncAlarmsToSW(reg));
   };
 })();
+
+// ─── Fuel Tab: Hijri Calendar with fuel coloring ─────────────────────────────
+
+
+function getFuelPeriodIndex(gDate) {
+  const diffDays = Math.floor((gDate - FUEL_START) / 86400000);
+  if (diffDays < 0) return -1;
+  return Math.floor(diffDays / 5) % 5;
+}
+
+let selectedFuelH = null;
+
+// ─── Fuel Tab: Miladi Calendar with fuel coloring ────────────────────────────
+let currentFuelM = { month: now.getMonth(), year: now.getFullYear() };
+let selectedFuelM = null;
+
+function renderFuelHijri() {
+  // Renamed but now renders Miladi calendar
+  document.getElementById('fuelMiladiMonthName').textContent = miladiMonths[currentFuelM.month];
+  document.getElementById('fuelMiladiYearDisplay').textContent = currentFuelM.year;
+
+  const grid = document.getElementById('fuelHijriDaysGrid');
+  grid.innerHTML = '';
+
+  const daysInM = new Date(currentFuelM.year, currentFuelM.month + 1, 0).getDate();
+  const firstDay = new Date(currentFuelM.year, currentFuelM.month, 1).getDay();
+  const daysInPrev = new Date(currentFuelM.year, currentFuelM.month, 0).getDate();
+  const nowDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  // Leading blank cells (prev month)
+  for (let i = firstDay - 1; i >= 0; i--) {
+    const cell = document.createElement('div');
+    cell.className = 'day-cell other-month empty';
+    const n = document.createElement('div'); n.className = 'day-miladi'; n.textContent = daysInPrev - i;
+    cell.appendChild(n);
+    grid.appendChild(cell);
+  }
+
+  for (let d = 1; d <= daysInM; d++) {
+    const cell = document.createElement('div');
+    cell.className = 'day-cell';
+    const dateObj = new Date(currentFuelM.year, currentFuelM.month, d);
+    const dow = dateObj.getDay();
+    const gNorm = new Date(currentFuelM.year, currentFuelM.month, d);
+
+    const numDiv = document.createElement('div');
+    numDiv.className = 'day-miladi';
+    numDiv.textContent = d;
+    cell.appendChild(numDiv);
+
+    if (dow === 0) cell.classList.add('sunday');
+    if (gNorm.getTime() === nowDate.getTime()) cell.classList.add('today');
+
+    if (selectedFuelM && selectedFuelM.d === d && selectedFuelM.m === currentFuelM.month && selectedFuelM.y === currentFuelM.year)
+      cell.classList.add('selected');
+
+    const periodIndex = getFuelPeriodIndex(gNorm);
+    if (periodIndex >= 0) {
+      cell.classList.add('fuel-period-' + periodIndex);
+      // بداية الدورة: اليوم الأول من كل 5 أيام
+      const diffDays = Math.floor((gNorm - FUEL_START) / 86400000);
+      if (diffDays >= 0 && diffDays % 5 === 0) cell.classList.add('fuel-cycle-start');
+    }
+
+    if (fuelMarkedDate) {
+      const markedG = new Date(fuelMarkedDate.y, fuelMarkedDate.m, fuelMarkedDate.d);
+      if (markedG.getTime() === gNorm.getTime()) cell.classList.add('fuel-marked');
+    }
+
+    cell.addEventListener('click', () => {
+      if (selectedFuelM && selectedFuelM.d === d && selectedFuelM.m === currentFuelM.month && selectedFuelM.y === currentFuelM.year) {
+        const alreadyMarked = fuelMarkedDate &&
+          new Date(fuelMarkedDate.y, fuelMarkedDate.m, fuelMarkedDate.d).getTime() === gNorm.getTime();
+        fuelMarkedDate = alreadyMarked ? null : { d, m: currentFuelM.month, y: currentFuelM.year };
+        localStorage.setItem('fuelMarkedDate', fuelMarkedDate ? JSON.stringify(fuelMarkedDate) : 'null');
+        updateFuelInfoBarH();
+        updateFuelInfoBar();
+      }
+      selectedFuelM = { d, m: currentFuelM.month, y: currentFuelM.year };
+      document.getElementById('fuelHijriSelectedDate').textContent =
+        dayNames[dow] + '، ' + d + '/' + (currentFuelM.month+1) + '/' + currentFuelM.year;
+      renderFuelHijri();
+    });
+
+    grid.appendChild(cell);
+  }
+
+  // Trailing cells
+  const remaining = 42 - grid.children.length;
+  for (let d = 1; d <= remaining; d++) {
+    const cell = document.createElement('div');
+    cell.className = 'day-cell other-month empty';
+    const n = document.createElement('div'); n.className = 'day-miladi'; n.textContent = d;
+    cell.appendChild(n);
+    grid.appendChild(cell);
+  }
+}
+
+function navigateFuelH(dir) {
+  currentFuelM.month += dir;
+  if (currentFuelM.month > 11) { currentFuelM.month = 0; currentFuelM.year++; }
+  if (currentFuelM.month < 0)  { currentFuelM.month = 11; currentFuelM.year--; }
+  renderFuelHijri();
+}
+
+function goTodayFuelH() {
+  currentFuelM = { month: now.getMonth(), year: now.getFullYear() };
+  selectedFuelM = null;
+  renderFuelHijri();
+}
+
+function updateFuelInfoBarH() {
+  const bar = document.getElementById('fuelInfoBarH');
+  if (!bar) return;
+  bar.classList.add('visible');
+  const nextFuelDate = getNextFuelDate();
+  const msToNext = nextFuelDate - new Date();
+  document.getElementById('fuelInfoNextCountdownH').textContent = formatCountdownFull(Math.max(0, msToNext));
+  const markedRowH = document.getElementById('fuelMarkedRowH');
+  const markedDisplayH = document.getElementById('fuelMarkedDisplayH');
+  if (fuelMarkedDate) {
+    markedDisplayH.textContent = fuelMarkedDate.d + '/' + (fuelMarkedDate.m + 1) + '/' + fuelMarkedDate.y;
+    markedRowH.style.display = 'flex';
+  } else {
+    markedRowH.style.display = 'none';
+  }
+}
+
+setInterval(() => { if (activeTab === 'fuel') updateFuelInfoBarH(); }, 60000);
+
+// ─── فول بنزين Button Logic ──────────────────────────────────────────────────
+let fuelFilled = localStorage.getItem('fuelFilled') === 'true';
+let fuelFilledDate = localStorage.getItem('fuelFilledDate') || null;
+let fuelFilledCycle = localStorage.getItem('fuelFilledCycle') || null; // أي دورة يخص هذا التفويل
+
+// يرجع مفتاح (timestamp) بداية الدورة الحالية (الـ 5 أيام) التي يقع اليوم ضمنها
+function getCurrentCycleKey() {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const startDay = new Date(FUEL_ALARM_START);
+  startDay.setHours(0, 0, 0, 0);
+  const diffDays = Math.floor((today - startDay) / 86400000);
+  const rem = diffDays % 5;
+  const cycleStart = new Date(today);
+  cycleStart.setDate(today.getDate() - rem);
+  return cycleStart.getTime();
+}
+
+function toggleFuelFill() {
+  fuelFilled = !fuelFilled;
+  localStorage.setItem('fuelFilled', fuelFilled);
+  if (fuelFilled) {
+    fuelFilledDate = new Date().toISOString();
+    localStorage.setItem('fuelFilledDate', fuelFilledDate);
+    fuelFilledCycle = String(getCurrentCycleKey());
+    localStorage.setItem('fuelFilledCycle', fuelFilledCycle);
+  }
+  updateFuelFillBtn();
+  renderFuelHijri(); // re-render to update marked date
+}
+
+function updateFuelFillBtn() {
+  const btn = document.getElementById('fuelFillBtn');
+  const txt = document.getElementById('fuelFillBtnText');
+  if (!btn) return;
+  // Check if next fuel date has arrived
+  const nextFuel = getNextFuelDate();
+  const now2 = new Date();
+  const isReady = nextFuel <= now2;
+  const currentCycleKey = String(getCurrentCycleKey());
+
+  if (fuelFilled && fuelFilledCycle !== currentCycleKey) {
+    // التفويل المسجّل يخص دورة قديمة انتهت — رجّع الزر لحالة الجاهزية للدورة الجديدة
+    fuelFilled = false;
+    localStorage.setItem('fuelFilled', 'false');
+  }
+
+  if (fuelFilled) {
+    btn.classList.add('fuel-filled');
+    btn.classList.remove('fuel-ready');
+    txt.textContent = 'تم التفويل';
+  } else if (isReady) {
+    btn.classList.add('fuel-ready');
+    btn.classList.remove('fuel-filled');
+    txt.textContent = 'فول بنزين';
+  } else {
+    btn.classList.remove('fuel-filled','fuel-ready');
+    txt.textContent = 'فول بنزين';
+  }
+}
+
+// Check every minute if next fuel date arrived
+setInterval(() => {
+  if (activeTab === 'fuel') updateFuelFillBtn();
+}, 60000);
+
+// Init button state when switching to fuel tab
+const _origSwitchTab = window.switchTab;
+window.switchTab = function(tab) {
+  _origSwitchTab(tab);
+  if (tab === 'fuel') updateFuelFillBtn();
+};
+
+// فتح التطبيق على تبويب البنزين مباشرة
+switchTab('fuel');
 
 </script>
 </body>

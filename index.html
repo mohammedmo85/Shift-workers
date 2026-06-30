@@ -2965,8 +2965,8 @@ function installPWA() {
   // عدّل هذين السطرين بعد تشغيل السيرفر:
   // 1) PUSH_SERVER_URL: رابط سيرفرك (مثال: 'https://your-app.onrender.com')
   // 2) PUSH_VAPID_PUBLIC_KEY: المفتاح العام الذي طبعه أمر "npm run generate-vapid"
-  const PUSH_SERVER_URL = 'https://YOUR-PUSH-SERVER-URL';
-  const PUSH_VAPID_PUBLIC_KEY = 'YOUR-VAPID-PUBLIC-KEY';
+  const PUSH_SERVER_URL = 'https://noc-push-server-production.up.railway.app';
+  const PUSH_VAPID_PUBLIC_KEY = 'BBv_EGNTtN7LMnIRWdQzELsroqhBNT5mpSSo404pVSpZZREhyhddD_cJNleX832o1_pc1j0DdOVArimGMwg0qLM';
 
   function urlBase64ToUint8Array(base64String) {
     const padding = '='.repeat((4 - base64String.length % 4) % 4);

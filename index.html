@@ -2294,7 +2294,14 @@ function showAlarmStatus(msg) {
 function requestNotificationPermission() {
   if ('Notification' in window && Notification.permission === 'default') {
     Notification.requestPermission().then(p => {
-      if (p === 'granted') showAlarmStatus('🔔 تم السماح بالإشعارات!');
+      if (p === 'granted') {
+        showAlarmStatus('🔔 تم السماح بالإشعارات!');
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.ready.then(reg => {
+            if (window._subscribeToRealPush) window._subscribeToRealPush(reg);
+          });
+        }
+      }
     });
   }
 }
@@ -2308,7 +2315,21 @@ function getAudioCtx() {
   if (sharedAudioCtx.state === 'suspended') sharedAudioCtx.resume();
   return sharedAudioCtx;
 }
-document.addEventListener('click', () => { try { getAudioCtx(); } catch(e){} }, { once: true });
+document.addEventListener('click', () => {
+  try { getAudioCtx(); } catch(e){}
+  // شغّل صوتاً صامتاً كل 25 ثانية للحفاظ على AudioContext حياً
+  function keepAlive() {
+    try {
+      const ctx = getAudioCtx();
+      const buf = ctx.createBuffer(1, 1, 22050);
+      const src = ctx.createBufferSource();
+      src.buffer = buf;
+      src.connect(ctx.destination);
+      src.start(0);
+    } catch(e) {}
+  }
+  setInterval(keepAlive, 25000);
+}, { once: true });
 
 function playAlarmSound(isFuel) {
   if (isFuel) {
@@ -2613,12 +2634,16 @@ function checkAlarms() {
     };
     sendNotif();
 
-    // ── تنبيه مرئي داخل التطبيق ──
-    showInAppAlertBanner(alarmTitle, alarmDesc, !!a.fuelAlarm);
-
-    showAlarmStatus(`🔔 ${alarmDesc}`);
+    // ── صوت للبصمة والبنزين ──
+    try { if (sharedAudioCtx && sharedAudioCtx.state === 'suspended') sharedAudioCtx.resume(); } catch(e){}
     playAlarmSound(!!a.fuelAlarm);
-    if (a.fuelAlarm) showFuelOverlay();
+
+    // ── تنبيه مرئي داخل التطبيق (للبنزين فقط) ──
+    if (a.fuelAlarm) {
+      showInAppAlertBanner(alarmTitle, alarmDesc, true);
+      showAlarmStatus(`🔔 ${alarmDesc}`);
+      showFuelOverlay();
+    }
   });
 }
 
@@ -2936,179 +2961,107 @@ function installPWA() {
 (function initServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
 
-  // بناء كود الـ Service Worker كـ Blob
-  const swCode = `
-const CACHE_NAME = 'noc-pwa-v1';
-const DB_KEY = 'noc_alarms_v1';
+  // ═══ إعدادات سيرفر الـ Push الحقيقي ═══════════════════════════════════════
+  // عدّل هذين السطرين بعد تشغيل السيرفر:
+  // 1) PUSH_SERVER_URL: رابط سيرفرك (مثال: 'https://your-app.onrender.com')
+  // 2) PUSH_VAPID_PUBLIC_KEY: المفتاح العام الذي طبعه أمر "npm run generate-vapid"
+  const PUSH_SERVER_URL = 'https://YOUR-PUSH-SERVER-URL';
+  const PUSH_VAPID_PUBLIC_KEY = 'YOUR-VAPID-PUBLIC-KEY';
 
-// ─── تثبيت: كاش الصفحة الرئيسية ─────────────────────────────────────────────
-self.addEventListener('install', e => {
-  self.skipWaiting();
-  e.waitUntil(
-    caches.open(CACHE_NAME).then(cache => {
-      // كاش الصفحة نفسها (سيتم تعبئتها من أول fetch)
-      return Promise.resolve();
-    })
-  );
-});
-
-self.addEventListener('activate', e => {
-  e.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE_NAME && k !== DB_KEY).map(k => caches.delete(k)))
-    ).then(() => self.clients.claim())
-  );
-});
-
-// ─── Fetch: خدمة الصفحة من الكاش ─────────────────────────────────────────────
-self.addEventListener('fetch', e => {
-  // حفظ بيانات المنبهات
-  if (e.request.url.includes('/noc-alarm-data-save')) {
-    e.respondWith(
-      e.request.json().then(async data => {
-        const cache = await caches.open(DB_KEY);
-        await cache.put('/noc-alarm-data', new Response(JSON.stringify(data), {
-          headers: { 'Content-Type': 'application/json' }
-        }));
-        return new Response('ok');
-      })
-    );
-    return;
+  function urlBase64ToUint8Array(base64String) {
+    const padding = '='.repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const rawData = atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+    for (let i = 0; i < rawData.length; i++) outputArray[i] = rawData.charCodeAt(i);
+    return outputArray;
   }
 
-  // للطلبات الخارجية (fonts وغيرها) — شبكة أولاً
-  if (!e.request.url.startsWith(self.location.origin)) {
-    e.respondWith(fetch(e.request).catch(() => new Response('')));
-    return;
-  }
+  let _pushEndpoint = null;
 
-  // الصفحة الرئيسية: كاش أولاً، ثم شبكة، ثم تحديث الكاش
-  e.respondWith(
-    caches.open(CACHE_NAME).then(async cache => {
-      const cached = await cache.match(e.request);
-      const fetchPromise = fetch(e.request).then(resp => {
-        if (resp && resp.status === 200) {
-          cache.put(e.request, resp.clone());
-        }
-        return resp;
-      }).catch(() => null);
-      return cached || fetchPromise;
-    })
-  );
-});
-
-// استقبال رسالة لحفظ المنبهات
-self.addEventListener('message', e => {
-  if (e.data && e.data.type === 'SAVE_ALARMS') {
-    self._alarmsData = e.data.payload;
-  }
-});
-
-// فحص المنبهات كل دقيقة عبر fetch event أو periodic sync
-self.addEventListener('periodicsync', e => {
-  if (e.tag === 'check-alarms') {
-    e.waitUntil(checkAndFireAlarms());
-  }
-});
-
-// فحص عند التثبيت والتفعيل
-self.addEventListener('activate', e => {
-  e.waitUntil(self.clients.claim());
-});
-
-// فحص دوري باستخدام setTimeout بديل عبر push
-self.addEventListener('push', e => {
-  e.waitUntil(checkAndFireAlarms());
-});
-
-// ─── منطق فحص المنبهات ───────────────────────────────────────────────────────
-async function checkAndFireAlarms() {
-  let payload;
-  try {
-    const clients = await self.clients.matchAll({ type: 'window' });
-    if (clients.length > 0) return; // التطبيق مفتوح، الـ JS الأصلي يتولى الأمر
-
-    // قراءة البيانات من Cache
-    const cache = await caches.open(DB_KEY);
-    const resp = await cache.match('/noc-alarm-data');
-    if (!resp) return;
-    payload = await resp.json();
-  } catch(e) { return; }
-
-  if (!payload) return;
-  const { alarms, states, fuelStart } = payload;
-  const now = new Date();
-  const h = now.getHours(), m = now.getMinutes();
-  const dayMs = now.setHours(0,0,0,0);
-
-  for (const a of alarms) {
-    if (!states[a.id]) continue;
-    if (a.fuelAlarm) {
-      // فحص يوم البنزين
-      const start = new Date(fuelStart);
-      start.setHours(0,0,0,0);
-      const diff = Math.floor((dayMs - start.getTime()) / 86400000);
-      if (diff < 0 || (diff % 5) !== 4) continue;
+  async function subscribeToRealPush(reg) {
+    if (!PUSH_SERVER_URL || PUSH_SERVER_URL.includes('YOUR-PUSH-SERVER-URL')) {
+      console.warn('[Push] لم يتم ضبط PUSH_SERVER_URL بعد — التنبيهات الحقيقية بالخلفية معطّلة');
+      return;
     }
-    if (a.hour !== h || a.min !== m) continue;
-
-    const title = a.fuelAlarm ? '⛽ تنبيه حصة البنزين' : '🔔 تنبيه وجبة';
-    const body  = a.fuelAlarm ? '⛽ غداً يوم استلام حصة البنزين!' : (a.icon + ' ' + a.desc);
-    await self.registration.showNotification(title, {
-      body,
-      icon: '/icon-192.png',
-      badge: '/icon-192.png',
-      vibrate: [300, 100, 300, 100, 300],
-      requireInteraction: true,
-      tag: a.id,
-      data: { url: self.location.origin }
-    });
+    if (!('pushManager' in reg)) return;
+    try {
+      let sub = await reg.pushManager.getSubscription();
+      if (!sub) {
+        sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(PUSH_VAPID_PUBLIC_KEY)
+        });
+      }
+      _pushEndpoint = sub.endpoint;
+      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Riyadh';
+      await fetch(PUSH_SERVER_URL + '/api/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          subscription: sub,
+          alarms: ALARMS,
+          states: alarmStates,
+          fuelStart: FUEL_ALARM_START.toISOString(),
+          timezone
+        })
+      });
+      console.log('[Push] تم الاشتراك بنجاح بالسيرفر الحقيقي');
+    } catch (e) {
+      console.warn('[Push] فشل الاشتراك:', e);
+    }
   }
-}
 
-// فتح التطبيق عند الضغط على الإشعار
-self.addEventListener('notificationclick', e => {
-  e.notification.close();
-  e.waitUntil(
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(cs => {
-      if (cs.length > 0) { cs[0].focus(); return; }
-      return self.clients.openWindow(e.notification.data?.url || '/');
-    })
-  );
-});
-
-// ─── حفظ بيانات Cache عند الطلب ──────────────────────────────────────────────
-self.addEventListener('fetch', e => {
-  if (e.request.url.includes('/noc-alarm-data-save')) {
-    e.respondWith(
-      e.request.json().then(async data => {
-        const cache = await caches.open(DB_KEY);
-        await cache.put('/noc-alarm-data', new Response(JSON.stringify(data), {
-          headers: { 'Content-Type': 'application/json' }
-        }));
-        return new Response('ok');
-      })
-    );
+  async function pushUpdateAlarmsToServer() {
+    if (!_pushEndpoint || !PUSH_SERVER_URL || PUSH_SERVER_URL.includes('YOUR-PUSH-SERVER-URL')) return;
+    try {
+      await fetch(PUSH_SERVER_URL + '/api/update-alarms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          endpoint: _pushEndpoint,
+          alarms: ALARMS,
+          states: alarmStates,
+          fuelStart: FUEL_ALARM_START.toISOString()
+        })
+      });
+    } catch (e) {}
   }
-});
-`;
 
-  // تسجيل الـ SW من Blob
-  const blob = new Blob([swCode], { type: 'application/javascript' });
-  const swUrl = URL.createObjectURL(blob);
+  window._subscribeToRealPush = subscribeToRealPush;
 
-  navigator.serviceWorker.register(swUrl, { scope: '/' })
-    .then(reg => {
+  // تسجيل الـ SW من ملف حقيقي (sw.js) بدلاً من Blob
+  navigator.serviceWorker.register('sw.js', { scope: './' })
+    .then(async reg => {
       console.log('[SW] مسجّل بنجاح');
 
-      // تسجيل Periodic Sync إذا متاح
+      // تسجيل Periodic Sync إذا متاح ويحتاج صلاحية periodic-background-sync
       if ('periodicSync' in reg) {
-        reg.periodicSync.register('check-alarms', { minInterval: 60 * 1000 })
-          .catch(() => {});
+        try {
+          const status = await navigator.permissions.query({ name: 'periodic-background-sync' });
+          if (status.state === 'granted') {
+            await reg.periodicSync.register('check-alarms', { minInterval: 15 * 60 * 1000 });
+            console.log('[SW] Periodic Sync مفعّل');
+          } else {
+            console.warn('[SW] صلاحية Periodic Sync غير ممنوحة — التنبيهات بالخلفية لن تعمل بدقة دون فتح التطبيق دورياً');
+          }
+        } catch (e) {
+          console.warn('[SW] Periodic Sync غير مدعوم على هذا المتصفح');
+        }
+      }
+
+      // شبكة أمان: محاولة Background Sync لمرة واحدة عند إغلاق التبويب
+      if ('sync' in reg) {
+        try { await reg.sync.register('check-alarms-once'); } catch (e) {}
       }
 
       // إرسال بيانات المنبهات للـ SW
       syncAlarmsToSW(reg);
+
+      // الاشتراك الحقيقي بسيرفر الـ Push (يحتاج إذن الإشعارات ممنوحاً)
+      if (Notification.permission === 'granted') {
+        subscribeToRealPush(reg);
+      }
     })
     .catch(err => console.warn('[SW] فشل التسجيل:', err));
 
@@ -3138,7 +3091,25 @@ self.addEventListener('fetch', e => {
   window.toggleAlarm = function(id) {
     _origToggleAlarm && _origToggleAlarm(id);
     navigator.serviceWorker.ready.then(reg => syncAlarmsToSW(reg));
+    pushUpdateAlarmsToServer();
   };
+
+  // إذا أُعطي إذن الإشعارات لاحقاً (بعد فتح أول مرة)، اشترك بالـ Push الحقيقي فوراً
+  window.addEventListener('focus', () => {
+    if (Notification.permission === 'granted' && !_pushEndpoint) {
+      navigator.serviceWorker.ready.then(reg => subscribeToRealPush(reg));
+    }
+  });
+
+  // ── استقبال أمر تشغيل الصوت من الـ SW عند النقر على الإشعار ──
+  navigator.serviceWorker.addEventListener('message', e => {
+    if (e.data && e.data.type === 'PLAY_ALARM_SOUND') {
+      try {
+        if (sharedAudioCtx && sharedAudioCtx.state === 'suspended') sharedAudioCtx.resume();
+      } catch(err) {}
+      playAlarmSound(!!e.data.isFuel);
+    }
+  });
 })();
 
 // ─── Fuel Tab: Hijri Calendar with fuel coloring ─────────────────────────────

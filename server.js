@@ -156,7 +156,10 @@ async function checkAndSend() {
       });
 
       try {
-        await webpush.sendNotification(entry.subscription, payload);
+        await webpush.sendNotification(entry.subscription, payload, {
+          urgency: 'high',
+          TTL: 60
+        });
         entry.lastFired[a.id] = dateKey;
         changed = true;
         console.log(`✓ أُرسل تنبيه "${a.id}" إلى ${endpoint.slice(0, 40)}...`);

@@ -72,8 +72,10 @@ self.addEventListener('push', e => {
         body: data.body || '',
         icon: 'icon-192.png',
         badge: 'icon-192.png',
-        vibrate: [300, 100, 300, 100, 300],
+        vibrate: [400, 150, 400, 150, 400, 150, 400],
         requireInteraction: true,
+        silent: false,
+        renotify: true,
         tag: data.tag || 'noc-alarm',
         data: { url: self.location.origin, isFuel: !!data.isFuel }
       })
@@ -126,8 +128,10 @@ async function checkAndFireAlarms() {
       body,
       icon: 'icon-192.png',
       badge: 'icon-192.png',
-      vibrate: [300, 100, 300, 100, 300],
+      vibrate: [400, 150, 400, 150, 400, 150, 400],
       requireInteraction: true,
+      silent: false,
+      renotify: true,
       tag: a.id,
       data: { url: self.location.origin, isFuel: !!a.fuelAlarm }
     });
